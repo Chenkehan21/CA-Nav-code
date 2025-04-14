@@ -174,7 +174,7 @@ sh run_r2r/main.sh
 
 # Acknowledge
 
-Our implementations are partially inspired by [SemExp](https://arxiv.org/abs/2007.00643) and [VLFM](https://arxiv.org/abs/2007.00643).
+Our implementations are partially inspired by [SemExp](https://arxiv.org/abs/2007.00643) and [ETPNav](https://arxiv.org/abs/2304.03047v2).
 Thanks for their great works!
 
 # Citation
