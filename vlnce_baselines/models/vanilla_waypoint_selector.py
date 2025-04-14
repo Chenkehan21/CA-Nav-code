@@ -76,10 +76,6 @@ class WaypointSelector(nn.Module):
             do not change waypoint if last waypoint's value is not getting too worse
             """
             curr_value = self._get_value(self._last_waypoint, value_map)
-            # curr_value = value_map[self._last_waypoint[0], self._last_waypoint[1]]
-            # if curr_value - self._last_value > -0.01:
-            #     best_waypoint = self._last_waypoint
-            #     best_value = curr_value
                 
             if (np.linalg.norm(self._last_waypoint - position) > self.distance_threshold and 
                 (curr_value - self._last_value > -0.03)):

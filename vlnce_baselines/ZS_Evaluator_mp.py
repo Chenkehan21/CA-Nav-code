@@ -14,7 +14,6 @@ from skimage.morphology import binary_closing
 
 import torch
 from torch import Tensor
-# import torch.distributed as distr
 from torchvision import transforms
 
 from habitat import Config, logger
@@ -31,7 +30,6 @@ from vlnce_baselines.map.history_map import HistoryMap
 from vlnce_baselines.map.direction_map import DirectionMap
 from vlnce_baselines.utils.data_utils import OrderedSet
 from vlnce_baselines.map.mapping import Semantic_Mapping
-from vlnce_baselines.map.skeleton_map import SkeletonMap
 from vlnce_baselines.models.Policy import FusionMapPolicy
 from vlnce_baselines.common.env_utils import construct_envs
 from vlnce_baselines.common.utils import gather_list_and_concat, get_device
@@ -71,8 +69,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
         self.classes = []
         self.current_episode_id = None
         self.current_detections = None
-        # self.max_constraint_steps = 25
-        # self.min_constraint_steps = 10
         self.map_channels = map_channels
         self.floor = np.zeros(self.map_shape)
         self.one_step_floor = np.zeros(self.map_shape)
@@ -80,18 +76,9 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
         self.traversible = np.zeros(self.map_shape)
         self.collision_map = np.zeros(self.map_shape)
         self.visited = np.zeros(self.map_shape)
-        self.base_classes = copy.deepcopy(base_classes) # 'chair', 'couch', 'plant', 'bed', 'toilet', 'tv', 'table', 'oven', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'cup', ...
+        self.base_classes = copy.deepcopy(base_classes)
         self.min_constraint_steps = config.EVAL.MIN_CONSTRAINT_STEPS
         self.max_constraint_steps = config.EVAL.MAX_CONSTRAINT_STEPS
-        
-    # for tensorboard
-    # @property
-    # def flush_secs(self):
-    #     return self._flush_secs
-
-    # @flush_secs.setter
-    # def flush_secs(self, value: int):
-    #     self._flush_secs = value
     
     def _set_eval_config(self) -> None:
         print("set eval configs")
@@ -103,19 +90,10 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
         self.config.MAP.RESULTS_DIR = self.config.RESULTS_DIR
         self.world_size = self.config.world_size
         self.local_rank = self.config.local_rank
-        # if self.world_size > 1:
-        #     distr.init_process_group(backend='nccl', init_method='env://')
-        #     self.device = self.config.TORCH_GPU_IDS[self.local_rank]
-        #     self.config.TORCH_GPU_ID = self.config.TORCH_GPU_IDS[self.local_rank]
         self.config.freeze()
         
     def _init_envs(self) -> None:
         print("start to initialize environments")
-        
-        """for DDP to load different data"""
-        # self.config.defrost()
-        # self.config.TASK_CONFIG.SEED = self.config.TASK_CONFIG.SEED + self.config.local_rank
-        # self.config.freeze()
 
         self.envs = construct_envs(
             self.config, 
@@ -164,7 +142,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
         self.mapping_module.eval()
         
         self.value_map_module = ValueMap(self.config, self.mapping_module.map_shape, self.device)
-        self.skeleton_module = SkeletonMap(self.config)
         self.history_module = HistoryMap(self.config, self.mapping_module.map_shape)
         self.direction_module = DirectionMap(self.config, self.mapping_module.map_shape)
         self.policy = FusionMapPolicy(self.config, self.mapping_module.map_shape[0])
@@ -351,39 +328,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
             else:
                 return llm_destination
         
-        # def _get_first_destination(sub_constraints: dict, llm_destination: str, decisions: dict) -> str:
-        #     for key, constraints in sub_constraints.items():
-        #         landmarks = decisions[key]["landmarks"]
-        #         for constraint in constraints:
-        #             if constraint[0] == "direction constraint":
-        #                 continue
-        #             else:
-        #                 landmark = constraint[1]
-        #                 for item in landmarks:
-        #                     print(landmark, item)
-        #                     if landmark in item:
-        #                         choice = item[1]
-        #                     else:
-        #                         continue
-        #                     print(choice, choice != "move away")
-        #                     if choice != "move away":
-        #                         return constraint[1]
-        #                     else:
-        #                         break
-        #     else:
-        #         return llm_destination
-        
-        # def _get_first_destination(sub_constraints: dict, llm_destination: str) -> str:
-        #     for constraints in sub_constraints.values():
-        #         destinations = [item[1] for item in constraints if item[0] != "direction constraint"]
-        #         if len(destinations) == 0:
-        #             continue
-        #         else:
-        #             destination = ",".join(destinations)
-        #             return destination
-        #     else:
-        #         return llm_destination
-        
         self.llm_reply = obs['llm_reply']
         self.instruction = obs['instruction']['text']
         self.sub_instructions = self.llm_reply['sub-instructions']
@@ -413,7 +357,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
         free_mask = 1 - np.logical_or(obstacles, objects)
         free_mask = np.logical_or(free_mask, navigable)
         floor = explored_area * free_mask
-        # floor = explored_area * traversible
         floor = remove_small_objects(floor, min_size=400).astype(bool)
         floor = binary_closing(floor, selem=disk(kernel_size))
         
@@ -431,7 +374,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
         selem = disk(kernel_size)
         obstacles_closed = binary_closing(obstacles, selem=selem)
         objects_closed = binary_closing(objects, selem=selem)
-        # explored_area = closing(explored_area, selem=selem)
         navigable = np.logical_or.reduce(full_map[map_channels:, ...][navigable_index])
         navigable = np.logical_and(navigable, np.logical_not(objects))
         navigable_closed = binary_closing(navigable, selem=selem)
@@ -441,17 +383,13 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
         untraversible = remove_small_objects(untraversible, min_size=64)
         untraversible = binary_closing(untraversible, selem=disk(3))
         traversible = np.logical_not(untraversible)
-        # traversible = np.logical_or(traversible, navigable)
 
         free_mask = 1 - np.logical_or(obstacles, objects)
         free_mask = np.logical_or(free_mask, navigable)
         floor = explored_area * free_mask
-        # floor = explored_area * traversible
         floor = remove_small_objects(floor, min_size=400).astype(bool)
         floor = binary_closing(floor, selem=selem)
         traversible = np.logical_or(floor, traversible)
-        
-        # skeleton, angle_info = self.skeleton_module(floor, self.current_episode_id, step)
         
         explored_area = binary_closing(explored_area, selem=selem)
         contours, _ = cv2.findContours(explored_area.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -459,18 +397,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
         image = cv2.drawContours(image, contours, -1, (255, 255, 255), thickness=3)
         frontiers = np.logical_and(floor, image)
         frontiers = remove_small_objects(frontiers.astype(bool), min_size=64)
-        # cv2.imshow("explored", np.flipud(explored_area.astype(np.uint8) * 255))
-        # cv2.imshow("frontiers", np.flipud(frontiers.astype(np.uint8) * 255))
-        # cv2.imshow("traversible", np.flipud(traversible.astype(np.uint8) * 255))
-        
-        # res = np.logical_xor(floor, traversible)
-        # nb_components, output, _, _ = cv2.connectedComponentsWithStats(res.astype(np.uint8))
-        # if nb_components > 2:
-        #     areas = [np.sum(output == i) for i in range(1, nb_components)]
-        #     max_id = areas.index(max(areas)) + 1
-        #     for i in range(1, nb_components):
-        #         if i != max_id:
-        #             floor = np.logical_or(floor, output==i)
 
         return traversible, floor, frontiers.astype(np.uint8)
     
@@ -487,11 +413,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
         full_map, full_pose, _ = self.mapping_module.update_map(0, self.detected_classes, self.current_episode_id)
         self.mapping_module.one_step_full_map.fill_(0.)
         self.mapping_module.one_step_local_map.fill_(0.)
-        
-        # blip_value = self.value_map_module.get_blip_value(Image.fromarray(obs[0]['rgb']), self.destination) #大小1x1
-        # blip_value = blip_value.detach().cpu().numpy()
-        # self.value_map_module(0, full_map[0], self.floor, self.collision_map, 
-        #                       blip_value, full_pose[0], self.detected_classes, self.current_episode_id)
     
     def _look_around(self):
         print("\n========== LOOK AROUND ==========\n")
@@ -519,18 +440,11 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
             value_map = self.value_map_module(step, full_map[0], self.floor, self.one_step_floor, 
                                               self.collision_map, blip_value, full_pose[0], 
                                   self.detected_classes, self.current_episode_id)
-            # torch.save(self.value_map_module.value_map[1], 
-            #            "/data/ckh/Zero-Shot-VLN-FusionMap/tests/value_maps/value_map%d.pt"%step)
         self._action = self.policy(self.value_map_module.value_map[1], self.collision_map,
                                     full_map[0], self.floor, self.traversible, 
                                     full_pose[0], self.frontiers, self.detected_classes,
                                     self.destination_class, self.classes, False, one_step_full_map[0], 
                                     self.current_detections, self.current_episode_id, False, step)
-            
-            
-            # cv2.imshow("self.traversible", np.flipud(self.traversible.astype(np.uint8) * 255))
-            # cv2.imshow("self.floor", np.flipud(self.floor.astype(np.uint8) * 255))
-            # cv2.imshow("self.frontiers", np.flipud(self.frontiers.astype(np.uint8) * 255))
         
         return full_pose, obs, dones, infos
     
@@ -585,11 +499,11 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
         current_pose = full_pose[0]
         self._action2 = None
         current_idx = self.constraints_check.index(False)
-        landmarks = self.decisions[str(current_idx)]['landmarks']   #第一个子指令中的landmark
+        landmarks = self.decisions[str(current_idx)]['landmarks']
         self.destination_class = [item[0] for item in landmarks]
-        self.classes = self._process_classes(self.base_classes, self.destination_class) #将第一个子指令中的landmark加入classes
+        self.classes = self._process_classes(self.base_classes, self.destination_class)
         current_constraint = self.sub_constraints[str(current_idx)]
-        all_constraint_types = [item[0] for item in current_constraint] #direction, location, object
+        all_constraint_types = [item[0] for item in current_constraint]
         
         for step in range(12, self.max_step):
             print(f"\nepisode:{self.current_episode_id}, step:{step}")
@@ -611,11 +525,7 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
             history_map = self.history_module(trajectory_points, step, self.current_episode_id)
 
             if "direction constraint" in all_constraint_types and start_check_pose is None:
-                start_check_pose = full_pose[0] # fix last pose the first time try the direction constraint
-            
-            # if sum(self.constraints_check) >= len(self.sub_instructions) - 1:
-            #     search_destination = True
-            #     print("start to search destination")
+                start_check_pose = full_pose[0]
             
             if int(current_idx) >= len(self.sub_instructions) - 1:
                 search_destination = True
@@ -655,7 +565,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
                                           for i in range(len(current_constraint)) 
                                           if not check[i]]
                     all_constraint_types = [item[0] for item in current_constraint]
-                # if (sum(check) == len(check) or constraint_steps >= int(250 / len(self.sub_instructions))):
                 if (sum(check) == len(check) or constraint_steps >= self.max_constraint_steps):
                     if not start_to_wait:
                         start_to_wait = True
@@ -679,19 +588,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
                     
             print("current constraint: ", current_constraint)
             print("constraint_steps: ", constraint_steps)
-            
-            # use first not direction constraint landmark as blip2 prompt
-            # if len(current_constraint) > 0 and current_constraint[0][0] != "direction constraint":
-            #     new_destination = current_constraint[0][1]
-            #     if current_idx >= len(self.sub_instructions) - 1:
-            #         self.destination = self.llm_reply['destination']
-            #     else:
-            #         self.destination = new_destination
-            
-            # self.destination = self._check_destination(current_idx, 
-            #                                            self.sub_constraints, 
-            #                                            self.llm_reply['destination'], 
-            #                                            self.decisions)
                 
             # process empty constraint and landmark
             if len(current_constraint) > 0 and current_constraint[0][0] != "direction constraint":
@@ -703,45 +599,9 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
             if len(current_constraint) == 0 and current_idx >=len(self.sub_constraints) - 1:
                 self.destination = self.llm_reply['destination']
                 
-            # contact all constraints in one sub-instruction
-            # new_destinations = [item[1] for item in self.sub_constraints[str(current_idx)] 
-            #                     if item[0] != "direction constraint"]
-            # if len(new_destinations) > 0:
-            #     new_destination = " and ".join(new_destinations)
-            #     self.destination = new_destination
-            
-            # contact all constraints in one sub-instruction and use llm-destination
-            # new_destinations = [item[1] for item in self.sub_constraints[str(current_idx)] 
-            #                     if item[0] != "direction constraint"]
-            # if len(new_destinations) > 0:
-            #     new_destination = " and ".join(new_destinations)
-            #     if current_idx >= len(self.sub_instructions) - 1:
-            #         self.destination = self.llm_reply['destination']
-            #     else:
-            #         self.destination = new_destination
-            
-            # sliding window
-            # new_destinations = [item[1] for item in self.sub_constraints[str(current_idx)] 
-            #                     if item[0] != "direction constraint"]
-            # if current_idx > 0:
-            #     last_destinations = [item[1] for item in self.sub_constraints[str(current_idx - 1)]
-            #                     if item[0] != "direction constraint"]
-            #     new_destinations += last_destinations
-            #     new_destinations = [item for i, item in enumerate(new_destinations) if new_destinations.index(item) == i]
-            # if len(new_destinations) > 0:
-            #     new_destination = ",".join(new_destinations)
-            #     self.destination = new_destination
-            
-            # use sub-instruction as blip2 prompt
-            # new_destination = self.sub_instructions[current_idx]
-            # if current_idx >= len(self.sub_instructions) - 1:
-            #     self.destination = self.llm_reply['destination']
-            # else:
-            #     self.destination = new_destination
-            if self.destination != self.last_destination:   #如果上一步的destination到达了，则value map重新置0
+            if self.destination != self.last_destination:
                 self.value_map_module.value_map[...] *= 0.5
                 self.last_destination = self.destination
-                # self._look_around()
                 
             if np.sum(self.value_map_module.value_map[1].astype(bool)) <= 24**2:
                 empty_value_map += 1
@@ -755,9 +615,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
                     break
                 empty_value_map = 0
                 constraint_steps = 0
-            print("value map area: ", np.sum(self.value_map_module.value_map[1].astype(bool)))
-            print("destination: ", self.destination)
-            print("destination classes: ", self.destination_class)
             
             actions = []
             for _ in range(self.config.NUM_ENVIRONMENTS):
@@ -772,7 +629,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
             if dones[0]:
                 self._calculate_metric(infos)
                 break
-            # 为下一次rollout准备
             batch_obs = self._batch_obs(obs)
             poses = torch.from_numpy(np.array([item['sensor_pose'] for item in obs])).float().to(self.device)
             self.mapping_module(batch_obs, poses)
@@ -783,11 +639,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
             
             self.traversible, self.floor, self.frontiers = self._process_map(step, full_map[0])
             self.one_step_floor = self._process_one_step_floor(one_step_full_map[0])
-            # cv2.imshow("collision_map", (np.flipud(self.collision_map * 255)).astype(np.uint8))
-            # cv2.waitKey(1)
-            # cv2.imshow("self.traversible", np.flipud(self.traversible.astype(np.uint8) * 255))
-            # cv2.imshow("self.floor", np.flipud(self.floor.astype(np.uint8) * 255))
-            # cv2.imshow("self.frontiers", np.flipud(self.frontiers.astype(np.uint8) * 255))
             
             last_pose = current_pose
             current_pose = full_pose[0]
@@ -812,177 +663,17 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
                 collision_map = collision_check_fmm(last_pose, current_pose, self.resolution, 
                                                 self.mapping_module.map_shape)
                 self.collision_map = np.logical_or(self.collision_map, collision_map)
-                # self.collision_map[self.visited == 1] = 0
             
             blip_value = self.value_map_module.get_blip_value(Image.fromarray(obs[0]['rgb']), self.destination)
             blip_value = blip_value.detach().cpu().numpy()
             value_map = self.value_map_module(step, full_map[0], self.floor, self.one_step_floor, self.collision_map, 
                                   blip_value, full_pose[0], self.detected_classes, self.current_episode_id)
-            print("value map area here: ", np.sum(self.value_map_module.value_map[1].astype(bool)))
-            # torch.save(self.value_map_module.value_map[1], 
-            #            "/data/ckh/Zero-Shot-VLN-FusionMap/tests/value_maps/value_map%d.pt"%step)
             self._action = self.policy(self.value_map_module.value_map[1] * history_map, self.collision_map,
                                     full_map[0], self.floor, self.traversible, 
                                     full_pose[0], self.frontiers, self.detected_classes,
                                     self.destination_class, self.classes, search_destination, 
                                     one_step_full_map[0], self.current_detections, 
                                     self.current_episode_id, replan, step)
-    
-    # check every constraint in sub-instruction subsequently
-    # def rollout(self):
-    #     """
-    #     execute a whole episode which consists of a sequence of sub-steps
-    #     """
-    #     self._maps_initialization()
-    #     full_pose, obs, dones, infos = self._look_around()
-    #     print("\n ========== START TO NAVIGATE ==========\n")
-        
-    #     constraint_steps = 0
-    #     start_to_wait = False
-    #     search_destination = False
-    #     last_action, current_action = None, None
-    #     last_pose, start_check_pose = None, None
-    #     current_pose = full_pose[0]
-    #     self._action2 = None
-    #     current_idx = self.constraints_check.index(False)
-    #     landmarks = self.decisions[str(current_idx)]['landmarks']   #第一个子指令中的landmark
-    #     self.destination_class = [item[0] for item in landmarks]
-    #     self.classes = self._process_classes(self.base_classes, self.destination_class) #将第一个子指令中的landmark加入classes
-    #     current_constraints = self.sub_constraints[str(current_idx)]
-    #     all_constraint_types = [item[0] for item in current_constraints] #direction, location, object
-        
-    #     for step in range(12, self.max_step):
-    #         print(f"\nepisode:{self.current_episode_id}, step:{step}")
-    #         print(f"instr: {self.instruction}")
-    #         print(f"sub_instr_{current_idx}: {self.sub_instructions[current_idx]}")
-    #         constraint_steps += 1
-    #         position = full_pose[0][:2] * 100 / self.resolution
-    #         y, x = int(position[0]), int(position[1])
-    #         self.visited[x, y] = 1
-            
-    #         if "direction constraint" in all_constraint_types and start_check_pose is None:
-    #             start_check_pose = full_pose[0] # fix last pose the first time try the direction constraint
-            
-    #         if sum(self.constraints_check) >= len(self.sub_instructions) - 1:
-    #             search_destination = True
-    #             print("start to search destination")
-                
-    #         if sum(self.constraints_check) < len(self.sub_instructions):
-    #             if len(current_constraints) > 0:
-    #                 current_constraint = [current_constraints[0]]
-    #                 print("current constraint: ", current_constraint)
-    #                 check = self.constraints_monitor(current_constraint, obs[0], 
-    #                                                 self.current_detections, self.classes, 
-    #                                                 current_pose, start_check_pose)
-    #                 print(current_constraint, check)
-    #                 if (sum(check) == len(check) or constraint_steps >= self.max_constraint_steps):
-    #                     if not start_to_wait:
-    #                         start_to_wait = True
-    #                         # self.constraints_check[current_idx] = True
-    #                 if start_to_wait and (constraint_steps >= self.min_constraint_steps):
-    #                     del current_constraints[0]
-    #                     constraint_steps = 0
-    #                     start_to_wait = False
-    #                     if len(current_constraints) >= 0:
-    #                         self.constraints_check[current_idx] = True
-    #                         if False in self.constraints_check:
-    #                             current_idx = self.constraints_check.index(False)
-    #                             print(f"sub_instr_{current_idx}: {self.sub_instructions[current_idx]}")
-    #                             landmarks = self.decisions[str(current_idx)]['landmarks']
-    #                             self.destination_class = [item[0] for item in landmarks]
-    #                             self.classes = self._process_classes(self.base_classes, self.destination_class)
-    #                             current_constraints = self.sub_constraints[str(current_idx)]
-    #                             all_constraint_types = [item[0] for item in current_constraints]
-    #                             current_pose, start_check_pose = None, None
-    #                         else:
-    #                             current_constraints, all_constraint_types = [], []
-    #                             print("all constraints are done")
-    #             elif current_idx < len(self.sub_instructions):
-    #                 self.constraints_check[current_idx] = True
-    #                 if False in self.constraints_check:
-    #                     current_idx = self.constraints_check.index(False)
-    #                     print(f"sub_instr_{current_idx}: {self.sub_instructions[current_idx]}")
-    #                     landmarks = self.decisions[str(current_idx)]['landmarks']
-    #                     self.destination_class = [item[0] for item in landmarks]
-    #                     self.classes = self._process_classes(self.base_classes, self.destination_class)
-    #                     current_constraints = self.sub_constraints[str(current_idx)]
-    #                     current_constraint = current_constraints[0]
-    #                     all_constraint_types = [item[0] for item in current_constraints]
-    #                     current_pose, start_check_pose = None, None
-    #                 else:
-    #                     current_constraints, all_constraint_types = [], []
-    #                     current_constraint = []
-    #                     print("all constraints are done")
-                    
-    #         print("current constraint: ", current_constraints)
-    #         print("constraint_steps: ", constraint_steps)
-            
-    #         # use first not direction constraint landmark as blip2 prompt
-    #         if len(current_constraint) > 0 and current_constraint[0][0] != "direction constraint":
-    #             new_destination = current_constraint[0][1]
-    #             if current_idx >= len(self.sub_instructions) - 1:
-    #                 self.destination = self.llm_reply['destination']
-    #             else:
-    #                 self.destination = new_destination
-                
-    #         if self.destination != self.last_destination:   #如果上一步的destination到达了，则value map重新置0
-    #             self.value_map_module.value_map[...] = 0.
-    #             self.last_destination = self.destination
-            
-    #         print("destination: ", self.destination)
-    #         print("destination classes: ", self.destination_class)
-            
-    #         actions = []
-    #         for _ in range(self.config.NUM_ENVIRONMENTS):
-    #             if self.keyboard_control:
-    #                 self._action2 =self._use_keyboard_control() 
-    #                 actions.append(self._action2)
-    #             else:
-    #                 actions.append(self._action)
-    #         outputs = self.envs.step(actions)
-    #         obs, _, dones, infos = [list(x) for x in zip(*outputs)]
-            
-    #         if dones[0]:
-    #             self._calculate_metric(infos)
-    #             break
-    #         # 为下一次rollout准备
-    #         batch_obs = self._batch_obs(obs)
-    #         poses = torch.from_numpy(np.array([item['sensor_pose'] for item in obs])).float().to(self.device)
-    #         self.mapping_module(batch_obs, poses)
-    #         full_map, full_pose, one_step_full_map = \
-    #             self.mapping_module.update_map(step, self.detected_classes, self.current_episode_id)
-    #         self.mapping_module.one_step_full_map.fill_(0.)
-    #         self.mapping_module.one_step_local_map.fill_(0.)
-            
-    #         self.traversible, self.floor, self.frontiers = self._process_map(full_map[0])
-    #         # cv2.imshow("collision_map", (np.flipud(self.collision_map * 255)).astype(np.uint8))
-    #         # cv2.waitKey(1)
-    #         # cv2.imshow("self.traversible", np.flipud(self.traversible.astype(np.uint8) * 255))
-    #         # cv2.imshow("self.floor", np.flipud(self.floor.astype(np.uint8) * 255))
-    #         # cv2.imshow("self.frontiers", np.flipud(self.frontiers.astype(np.uint8) * 255))
-            
-    #         last_pose = current_pose
-    #         current_pose = full_pose[0]
-    #         last_action = current_action
-    #         current_action = self._action
-    #         if last_pose is not None and current_action["action"] == 1:
-    #             collision_map = collision_check_fmm(last_pose, current_pose, self.resolution, 
-    #                                             self.mapping_module.map_shape)
-    #             self.collision_map = np.logical_or(self.collision_map, collision_map)
-    #             # self.collision_map[self.visited == 1] = 0
-            
-    #         blip_value = self.value_map_module.get_blip_value(Image.fromarray(obs[0]['rgb']), self.destination)
-    #         blip_value = blip_value.detach().cpu().numpy()
-    #         value_map = self.value_map_module(step, full_map[0], self.floor, self.collision_map, 
-    #                               blip_value, full_pose[0], self.detected_classes, self.current_episode_id)
-    #         # torch.save(self.value_map_module.value_map[1], 
-    #         #            "/data/ckh/Zero-Shot-VLN-FusionMap/tests/value_maps/value_map%d.pt"%step)
-    #         self._action = self.policy(self.value_map_module.value_map[1], self.collision_map,
-    #                                 full_map[0], self.floor, self.traversible, 
-    #                                 full_pose[0], self.frontiers, self.detected_classes,
-    #                                 self.destination_class, self.classes, search_destination, 
-    #                                 one_step_full_map[0], self.current_detections, 
-    #                                 self.current_episode_id, step)
     
     def eval(self):
         self._set_eval_config()
@@ -996,42 +687,12 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
             eps_to_eval = min(self.config.EVAL.EPISODE_COUNT, sum(self.envs.number_of_episodes))
             
         self.state_eps = {}
-        aggregated_states = {}
         t1 = time.time()
         for i in tqdm(range(eps_to_eval)):
             self.rollout()
             self.reset()
-            # if i > 0 and i % 9 == 0:
-            #     split = self.config.TASK_CONFIG.DATASET.SPLIT
-            #     fname = os.path.join(self.config.EVAL_CKPT_PATH_DIR, 
-            #                         f"stats_ep_ckpt_{split}_{i + 1}trajs.json"
-            #                         )
-            #     with open(fname, "w") as f:
-            #         json.dump(self.state_eps, f, indent=2)
                     
         self.envs.close()
-        
-        # if self.world_size > 1:
-        #     distr.barrier()
-            
-        # num_episodes = len(self.state_eps)
-        # for stat_key in next(iter(self.state_eps.values())).keys():
-        #     aggregated_states[stat_key] = (
-        #         sum(v[stat_key] for v in self.state_eps.values()) / num_episodes
-        #     )
-            
-        # total = torch.tensor(num_episodes).cuda()
-        # if self.world_size > 1:
-        #     distr.reduce(total,dst=0)
-        # total = total.item()
-
-        # if self.world_size > 1:
-        #     logger.info(f"rank {self.local_rank}'s {num_episodes}-episode results: {aggregated_states}")
-        #     for k,v in aggregated_states.items():
-        #         v = torch.tensor(v*num_episodes).cuda()
-        #         cat_v = gather_list_and_concat(v,self.world_size)
-        #         v = (sum(cat_v)/total).item()
-        #         aggregated_states[k] = v
         
         split = self.config.TASK_CONFIG.DATASET.SPLIT
         fname = os.path.join(self.config.EVAL_CKPT_PATH_DIR, 
@@ -1039,14 +700,6 @@ class ZeroShotVlnEvaluatorMP(BaseTrainer):
                              )
         with open(fname, "w") as f:
             json.dump(self.state_eps, f, indent=2)
-
-        # if self.local_rank < 1:
-        #     if self.config.EVAL.SAVE_RESULTS:
-        #         fname = os.path.join(self.config.EVAL_CKPT_PATH_DIR, f"stats_ckpt_{split}.json")
-        #         with open(fname, "w") as f:
-        #             json.dump(aggregated_states, f, indent=2)
-
-        #         logger.info(f"Episodes evaluated: {total}")
         t2 = time.time()
         logger.info(f"time: {t2 - t1}s")
         print("test time: ", t2 - t1)

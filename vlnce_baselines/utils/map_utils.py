@@ -203,9 +203,6 @@ def process_floor(map: np.ndarray, classes: List, kernel_size: int=3) -> np.ndar
     """
     t1 = time.time()
     navigable_index = process_navigable_classes(classes)
-    # print("classes: ", classes)
-    # print("navigable index: ", navigable_index)
-    # print("map length: ", len(map))
     navigable = np.zeros(map.shape[-2:])
     explored_area = map[1, ...]
     obstacles = map[0, ...]
@@ -220,14 +217,12 @@ def process_floor(map: np.ndarray, classes: List, kernel_size: int=3) -> np.ndar
     free_space = explored_area * free_mask
     floor = remove_small_objects(free_space.astype(bool), min_size=400)
     floor = closing(floor, selem=disk(kernel_size))
-    # floor = remove_small_objects(free_space.astype(bool), min_size=400)
     t2 = time.time()
     print("process floor cost time: ", t2 - t1)
     return floor
 
 
 def find_frontiers(map: np.ndarray, classes: List) -> np.ndarray:
-    # floor = process_floor(map)
     floor = get_floor_area(map, classes)
     explored_area = get_explored_area(map)
     contours, _ = cv2.findContours(explored_area.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -252,19 +247,7 @@ def get_traversible_area(map: np.ndarray, classes: List) -> np.ndarray:
     untraversible = remove_small_objects(untraversible, min_size=64)
     untraversible = closing(untraversible, selem=disk(3))
     traversible = 1 - untraversible
-    # traversible_area = np.sum(traversible)
-    # nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(traversible.astype(np.uint8))
-    # if nb_components > 2:
-    #     areas = [np.sum(output == i) for i in range(1, nb_components)]
-    #     left_areas = [traversible_area - item for item in areas]
-    #     min_idx = left_areas.index(min(left_areas)) + 1
-    #     res = np.ones(map.shape[-2:])
-    #     for i in range(nb_components):
-    #         if i != min_idx:    
-    #             res[output == i] = 0
-    #     return res
-    # else:
-    #     return traversible
+
     return traversible
 
 def get_floor_area(map: np.ndarray, classes: List) -> np.ndarray:
@@ -444,35 +427,6 @@ def collision_check(last_pose: np.ndarray, current_pose: np.ndarray,
         
     return collision_map
 
-# def collision_check_fmm(last_pose: np.ndarray, current_pose: np.ndarray,
-#                     resolution: float, map_shape: Sequence,
-#                     collision_threshold: float=0.2,
-#                     width: float=0.4, height: float=1.5, buf: float=0.2) -> np.ndarray:
-#     last_position, last_heading = get_agent_position(last_pose, resolution)
-#     current_position, current_heading = get_agent_position(current_pose, resolution)
-#     x, y = current_position
-#     position_vector = current_position - last_position
-#     displacement = np.linalg.norm(position_vector)
-#     collision_map = np.zeros(map_shape)
-#     print("displacement: ", displacement)
-    
-#     if displacement < collision_threshold * 100 / resolution:
-#         print("!!!!!!!!! COLLISION !!!!!!!!!")
-#         dx, dy = x - int(x), y - int(y)
-#         mask = get_mask(dx, dy, scale=1, step_size=5)
-#         direction_mask = create_sector_mask((5, 5), current_pose[-1], 6, 45, (11,11))
-#         collision_mask = np.logical_and(mask, direction_mask)
-#         x, y = int(x), int(y)
-#         print("!!!!!!!!!!!!!!!! collision x and y: ", x, y)
-#         collision_map[x - 5 : x + 6, y - 5: y + 6] = collision_mask
-#         collision_map[5,5] = 0
-        
-#         cv2.imshow("direction mask: ", (np.flipud(direction_mask * 255)).astype(np.uint8))
-#         cv2.imshow("mask: ", (np.flipud(mask * 255)).astype(np.uint8))
-#         cv2.imshow("collision mask: ", (np.flipud(collision_mask * 255)).astype(np.uint8))
-#         cv2.waitKey(1)
-    
-#     return collision_map
 
 def calculate_displacement(last_pose: np.ndarray, current_pose: np.ndarray, resolution: float):
     last_position, last_heading = get_agent_position(last_pose, resolution)
@@ -505,51 +459,5 @@ def collision_check_fmm(last_pose: np.ndarray, current_pose: np.ndarray,
         x, y = int(x), int(y)
         if x - 5 >= 0 and x + 6 < map_shape[0] and y - 5 >= 0 and y + 6 < map_shape[1]:
             collision_map[x - 5 : x + 6, y - 5 : y + 6] = collision_mask
-        # cv2.imshow("mask: ", (np.flipud(mask * 255)).astype(np.uint8))
-        # cv2.imshow("collision mask: ", (np.flipud(collision_mask * 255)).astype(np.uint8))
     
     return collision_map
-        
-    
-# def get_traversible_area(map: np.ndarray) -> np.ndarray:
-#     objects = get_objects(map)
-#     obstacles = get_obstacle(map)
-#     traversible = 1 - (objects + obstacles)
-
-#     return traversible
-
-
-# def get_obstacle(map: np.ndarray, kernel_size: int=3) -> np.ndarray:
-#     floor = map[4, ...] # channel is floor area
-#     floor_mask = 1 - (floor != 0)
-#     obstacle = map[0, ...] * floor_mask
-#     obstacle = remove_small_objects(
-#         obstacle.astype(bool), 
-#         min_size=50, # you can try different minimum object size
-#         connectivity=5)
-#     selem = disk(kernel_size)
-#     obstacle = closing(obstacle, selem)
-    
-#     return obstacle.astype(bool)
-
-
-# def get_floor(map: np.ndarray, kernel_size: int=3) -> np.ndarray:
-#     floor = map[4, ...]
-#     selem = disk(kernel_size)
-#     floor = closing(floor, selem)
-#     floor = remove_small_objects(floor.astype(bool), min_size=200)
-    
-#     return floor.astype(bool)
-
-
-# def process_floor(map: np.ndarray, kernel_size: int=3) -> np.ndarray:
-#     floor = get_floor(map, kernel_size)
-#     obstacles = get_obstacle(map, kernel_size)
-#     objects = get_objects(map, kernel_size)
-    
-#     obstacles_mask = (obstacles == False)
-#     objects_mask = (objects == False)
-#     floor = floor * objects_mask * obstacles_mask
-#     floor = remove_small_objects(floor.astype(bool), min_size=200)
-    
-#     return floor

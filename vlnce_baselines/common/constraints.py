@@ -18,8 +18,6 @@ class ConstraintsMonitor(nn.Module):
         self.resolution = config.MAP.MAP_RESOLUTION
         self.turn_angle = config.TASK_CONFIG.SIMULATOR.TURN_ANGLE
         self.device = device
-        # self.device = (torch.device("cuda", self.config.TORCH_GPU_ID) if 
-        #                torch.cuda.is_available() else torch.device("cpu"))
         self._load_from_disk()
         
     def _create_model(self):
@@ -102,7 +100,6 @@ class ConstraintsMonitor(nn.Module):
         for item in constraints:
             constraint_type, constraint_object = item[:2]
             constraint_type = constraint_type.lower().strip()
-            # import pdb;pdb.set_trace()
             if constraint_type == "location constraint":
                 check = self.location_constraint(obs, constraint_object)
                 res.append(check)

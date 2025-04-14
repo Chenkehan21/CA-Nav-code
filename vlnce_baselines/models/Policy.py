@@ -28,14 +28,6 @@ class FusionMapPolicy(nn.Module):
         self.print_images = config.MAP.PRINT_IMAGES
         self.resolution = config.MAP.MAP_RESOLUTION
         self.turn_angle = config.TASK_CONFIG.SIMULATOR.TURN_ANGLE
-        
-        # self.device = (
-        #     torch.device("cuda", self.config.TORCH_GPU_ID)
-        #     if torch.cuda.is_available()
-        #     else torch.device("cpu")
-        # )
-        
-        # self.frontier_policy = FrontierPolicy(config)
         self.superpixel_policy = SuperPixelPolicy(config)
         self.max_destination_socre = -1e5
         self.fixed_destination = None
@@ -45,7 +37,6 @@ class FusionMapPolicy(nn.Module):
         self.value_threshold = config.EVAL.VALUE_THRESHOLD
         
     def reset(self) -> None:
-        # self.frontier_policy.reset()
         self.superpixel_policy.reset()
         self.fixed_destination = None
         self.max_destination_socre = -1e5
@@ -123,12 +114,6 @@ class FusionMapPolicy(nn.Module):
         heading = -1 * full_pose[-1]
         rotation_matrix = np.array([[0, -1], 
                                     [1, 0]])
-        
-        # objects = get_objects(map)
-        # obstacles = get_obstacle(map)
-        # traversible = 1 - (objects + obstacles)
-        # traversible = get_traversible_area(map, classes)
-        # traversible = get_floor_area(map, classes)
         traversible[collision_map == 1] = 0
         planner = FMMPlanner(self.config, traversible, visualize=self.visualize)
         if traversible[waypoint[0], waypoint[1]] == 0:
@@ -147,7 +132,7 @@ class FusionMapPolicy(nn.Module):
             action = 0
             print("stop")
         elif stop and self.fixed_destination is None:
-            action = 2 # 这种情况后续考虑改成选择次优waypoint
+            action = 2
         else:
             relative_angle, action = angle_and_direction(heading_vector, waypoint_vector, self.turn_angle)
         
@@ -159,7 +144,6 @@ class FusionMapPolicy(nn.Module):
             normalized_data = cv2.circle(normalized_data, (waypoint[1], waypoint[0]), 
                                          radius=5, color=(0,0,255), thickness=1)
             cv2.imshow("fmm distance field", np.flipud(normalized_data))
-            # cv2.imwrite('img_debug/dist_field.png', np.flipud(normalized_data))
             
             cv2.waitKey(1)
         if self.print_images:
@@ -209,16 +193,10 @@ class FusionMapPolicy(nn.Module):
             destination_confidences = confidences[destination_ids]
             max_confidence_idx = np.argmax(destination_confidences)
             max_idx = destination_ids[max_confidence_idx].item()
-            # destination_mask = masks[max_idx]
             destination_confidence = confidences[max_idx]
             if destination_confidence > self.max_destination_confidence:
                 self.max_destination_confidence = destination_confidence
                 
-            # plt.imshow(destination_mask)
-            # plt.savefig("/data/ckh/Zero-Shot-VLN-FusionMap/tests/destination_mask/mask%d.png"%step)
-            # np.save("/data/ckh/Zero-Shot-VLN-FusionMap/tests/destination_mask/mask%d.npy"%step, destination_mask)
-            
-            # destination_waypoint = process_destination(destination_map, full_map, detected_classes)
             destination_waypoint = process_destination2(destination_map, floor, traversible)
             if destination_waypoint is not None:
                 x, y = destination_waypoint

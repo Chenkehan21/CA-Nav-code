@@ -39,7 +39,6 @@ class WaypointSelector(nn.Module):
                 value_map: np.ndarray, fmm_dist: np.ndarray, traversible: np.ndarray, replan: bool):
         best_waypoint, best_value = None, None
         invalid_waypoint = False
-        # print("last waypoint: ", self._last_waypoint, self._last_value)
         if not np.array_equal(self._last_waypoint, np.zeros(2)):
             if replan:
                 invalid_waypoint = True
@@ -81,9 +80,6 @@ class WaypointSelector(nn.Module):
             then we stick to it.
             """
             curr_value = self._get_value(self._last_waypoint, value_map)
-            # if curr_value - self._last_value > -0.01:
-            #     best_waypoint = self._last_waypoint
-            #     best_value = curr_value
                 
             if ((np.linalg.norm(self._last_waypoint - position) > self.distance_threshold) and 
                 (curr_value - self._last_value > self.change_threshold)):
@@ -111,6 +107,5 @@ class WaypointSelector(nn.Module):
         self._acyclic_enforcer.add_state_action(position, best_waypoint)
         self._last_value = best_value
         self._last_waypoint = best_waypoint
-        # print("best waypoint: ", best_waypoint)
         
         return best_waypoint, best_value, sorted_waypoints

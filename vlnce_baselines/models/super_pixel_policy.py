@@ -28,9 +28,6 @@ class SuperPixelPolicy(nn.Module):
     
     def _get_sorted_regions(self, full_map: np.ndarray, traversible: np.ndarray, value_map: np.ndarray, 
                             collision_map: np.ndarray, detected_classes: OrderedSet) -> List:
-        # floor = process_floor(full_map, detected_classes)
-        # traversible = get_traversible_area(full_map, detected_classes)
-        # t1 = time.time()
         valid_mask = value_map.astype(bool)
         min_val = np.min(value_map)
         max_val = np.max(value_map)
@@ -65,8 +62,7 @@ class SuperPixelPolicy(nn.Module):
             value_regions.append((mask, np.mean(masked_value[masked_value != 0]), waypoint))
         sorted_regions = sorted(value_regions, key=lambda x: x[1], reverse=True)
         waypoint_values =  np.array([item[1] for item in value_regions])
-        # t2 = time.time()
-        # print("real super pixel time: ", t2 - t1)
+        
         return sorted_regions
 
     def _get_sorted_region_fast_slic(self, full_map: np.ndarray, traversible: np.ndarray, value_map: np.ndarray, 
@@ -82,7 +78,6 @@ class SuperPixelPolicy(nn.Module):
         assignment *= valid_mask
         valid_labels = np.unique(assignment)[1:]
         value_regions = []
-        # t1 = time.time()
         for label in valid_labels:
             mask = np.zeros_like(value_map)
             mask[assignment == label] = 1
@@ -91,23 +86,13 @@ class SuperPixelPolicy(nn.Module):
             if np.sum(output == 1) < 100:
                 continue
             waypoint = np.array([int(centroids[1][1]), int(centroids[1][0])])
-            # if np.sum(collision_map) > 0:
-            #     nonzero_indices = np.argwhere(collision_map != 0)
-            #     distances = cdist([waypoint], nonzero_indices)
-            #     if np.min(distances) <= 5:
-            #         print("!!!!!!!!!!!!!!!!!waypoint close to collision area, change waypoint!")
-            #         continue
-            # waypoint = get_nearest_nonzero_waypoint(traversible, waypoint)
             value_mask = np.zeros_like(value_map)
             value_mask[waypoint[0] - 5: waypoint[0] + 5, waypoint[1] - 5: waypoint[1] + 5] = 1
             masked_value = value_mask * value_map
-            # import pdb;pdb.set_trace()
             if np.sum(masked_value) > 0:
                 value_regions.append((mask, np.mean(masked_value[masked_value != 0]), waypoint))
             else:
                 value_regions.append((mask, 0., waypoint))
-        # t2 = time.time()
-        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! loop time: ", t2 - t1)
         sorted_regions = sorted(value_regions, key=lambda x: x[1], reverse=True)
         
         return sorted_regions
@@ -130,18 +115,13 @@ class SuperPixelPolicy(nn.Module):
             
             return best_waypoint, best_value, sorted_waypoints
         else:
-            # t1 = time.time()
             sorted_regions = self._get_sorted_region_fast_slic(full_map, traversible, value_map, collision_map, detected_classes)
-            # t2 = time.time()
-            # print("super pixel time: ", t2 - t1)
             sorted_waypoints, sorted_values = self._sorted_waypoints(sorted_regions)
-            # print("sorted_waypoints and sorted values: ", sorted_waypoints, sorted_values)
             best_waypoint, best_value, sorted_waypoints = \
                 self.waypoint_selector(sorted_waypoints, position, collision_map, value_map, fmm_dist, traversible, replan)
                 
             if self.visualize:
                 self._visualize(sorted_regions, value_map, step, current_episode_id)
-            # print("best value: ", best_value)
             return best_waypoint, best_value, sorted_waypoints
     
     def _visualize(self, sorted_regions: List, value_map: np.ndarray, step: int, current_episode_id: int):
@@ -165,8 +145,6 @@ class SuperPixelPolicy(nn.Module):
         
         cv2.imshow("super pixel", np.flipud(res))
         cv2.waitKey(1)
-        # if self.visualize:
-            # cv2.imwrite('img_debug/super_pixel.png', np.flipud(res))
         
         if self.print_images:
             save_dir = os.path.join(self.config.RESULTS_DIR, "super_pixel/eps_%d"%current_episode_id)

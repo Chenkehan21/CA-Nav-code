@@ -33,7 +33,6 @@ def init_vis_image():
     color = (20, 20, 20)  # BGR
     thickness = 2
 
-    # text = "Observations (Goal: {})".format(goal_name)
     text = "Goal: "
     textsize = cv2.getTextSize(text, font, fontScale, thickness)[0]
     textX = (640 - textsize[0]) // 2 + 15
@@ -50,8 +49,6 @@ def init_vis_image():
                             font, fontScale, color, thickness,
                             cv2.LINE_AA)
 
-    # draw outlines
-    # Obeservation: (640, 480); semantic map: (480, 480)
     color = [100, 100, 100]
     vis_image[49, 15:655] = color
     vis_image[49, 670:1150] = color
