@@ -160,10 +160,10 @@ CA-Nav-code
 
 ## Running
 
-    ```bash
-    cd CA-NAV-code
-    sh run_r2r/main.sh
-    ```
+```bash
+cd CA-NAV-code
+sh run_r2r/main.sh
+```
 
 
 # Contact Information
