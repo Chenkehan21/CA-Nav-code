@@ -139,7 +139,7 @@ We address the task of Vision-Language Navigation in Continuous Environments (VL
 
 2. CA-Nav LLM Replys / BLIP2-ITM / BLIP2-VQA / Grounded-SAM
 
-    Download from [CA-Nav-Google-Drive](https://drive.google.com/drive/folders/1fHUDDnK-gNNABrcb5u_F93mAQhu8tC8z?usp=drive_link)
+    Download from [CA-Nav-Google-Drive](https://drive.google.com/drive/folders/1fHUDDnK-gNNABrcb5u_F93mAQhu8tC8z?usp=sharing)
 
 Overall, datas are organized as follows:
 
