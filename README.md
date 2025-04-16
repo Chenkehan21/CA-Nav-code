@@ -16,7 +16,7 @@
 <!-- <h3><strong>Accepted to <a href='https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=34' target='_blank'>TPAMI 2024</a></strong></h3> -->
 
 <h3 align="center">
-  <a href="https://arxiv.org/abs/2412.10137" target='_blank'>[Paper] &</a>
+  <a href="https://arxiv.org/abs/2412.10137v4" target='_blank'>[Paper] &</a>
   <a href="https://chenkehan21.github.io/CA-Nav-project/" target='_blank'>[Project]</a>
 </h3>
 </div>
