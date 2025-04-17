@@ -36,7 +36,7 @@ We address the task of Vision-Language Navigation in Continuous Environments (VL
 1. Create a virtual environment. We develop this project with Python 3.8:
 
    ```bash
-   conda env create -n CA-Nav python==3.8
+   conda create -n CA-Nav python==3.8
    conda activate CA-Nav
    ```
 
