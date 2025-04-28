@@ -149,7 +149,7 @@ CA-Nav-code
 │   ├── blip2
 │   ├── datasets
 │       ├── LLM_REPLYS_VAL_UNSEEN
-│       ├── R2R_VLNCE_v1-2_preprocessed
+│       ├── R2R_VLNCE_v1-3_preprocessed
 │   ├── grounded_sam
 │   ├── logs
 │   ├── scene_datasets
