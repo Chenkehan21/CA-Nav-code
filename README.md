@@ -18,6 +18,7 @@
 <h3 align="center">
   <a href="https://arxiv.org/abs/2412.10137v4" target='_blank'>[Paper] &</a>
   <a href="https://chenkehan21.github.io/CA-Nav-project/" target='_blank'>[Project]</a>
+  <a href="https://github.com/Chenkehan21/svm-nav" target='_blank'>[Real Robot Deployment]</a>
 </h3>
 </div>
 
