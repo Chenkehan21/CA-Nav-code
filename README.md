@@ -183,10 +183,13 @@ Thanks for their great works!
 If you find this repository is useful, please consider citing our paper:
 
 ```
-@article{chen2024CANav,
-    title={Constraint-Aware Zero-Shot Vision-Language Navigation in Continuous Environments}, 
-    author={Kehan Chen and Dong An and Yan Huang and Rongtao Xu and Yifei Su and Yonggen Ling and Ian Reid and Liang Wang},
-    year={2024},
-    journal={arXiv preprint arXiv:2412.10137}
+@article{chen2025canav,
+  title={Constraint-aware zero-shot vision-language navigation in continuous environments},
+  author={Chen, Kehan and An, Dong and Huang, Yan and Xu, Rongtao and Su, Yifei and Ling, Yonggen and Reid, Ian and Wang, Liang},
+  journal=TPAMI,
+  year={2025},
+  volume={47},
+  number={11},
+  pages={10441--10456}
 }
 ```
