@@ -183,6 +183,8 @@ Thanks for their great works!
 If you find this repository is useful, please consider citing our paper:
 
 ```
+@String(TPAMI = {IEEE Trans. Pattern Anal. Mach. Intell.})
+
 @article{chen2025canav,
   title={Constraint-aware zero-shot vision-language navigation in continuous environments},
   author={Chen, Kehan and An, Dong and Huang, Yan and Xu, Rongtao and Su, Yifei and Ling, Yonggen and Reid, Ian and Wang, Liang},
